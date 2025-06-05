@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:17.2
+    container_name: postgres
+    restart: on-failure
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: demo
+      TZ: Asia/Phnom_Penh
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d demo -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c max_connections=200
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+  redis:
+    image: redis/redis-stack-server:6.2.6-v19
+    container_name: redis
+    restart: on-failure
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+  rabbitmq:
+    image: rabbitmq:3.13.7-management-alpine
+    container_name: rabbitmq
+    restart: on-failure
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq
