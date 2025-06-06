@@ -1,5 +1,7 @@
 package com.keakimleang.springbatchwebflux.services;
 
+import com.fasterxml.jackson.databind.*;
+import com.keakimleang.springbatchwebflux.annotations.*;
 import com.keakimleang.springbatchwebflux.batches.*;
 import static com.keakimleang.springbatchwebflux.batches.consts.BatchFieldName.*;
 import com.keakimleang.springbatchwebflux.entities.*;
@@ -8,6 +10,7 @@ import com.keakimleang.springbatchwebflux.repos.*;
 import com.keakimleang.springbatchwebflux.utils.*;
 import java.io.*;
 import java.nio.file.*;
+import java.time.*;
 import lombok.*;
 import lombok.extern.slf4j.*;
 import org.springframework.batch.core.*;
@@ -24,8 +27,11 @@ public class BatchService {
     private final BatchUploadValidator batchUploadValidator;
     private final BatchUploadRepository batchUploadRepository;
     private final BatchUploadStagingRepository batchUploadStagingRepository;
+    private final BatchUploadProdRepository batchUploadProdRepository;
     private final JobLauncher jobLauncher;
     private final Job uploadBatchJob;
+    private final RedisCacheService redisCacheService;
+    private final ObjectMapper objectMapper;
 
     public Mono<Long> upload(final Mono<BatchUploadRequest> requestMono) {
         return requestMono
@@ -98,7 +104,7 @@ public class BatchService {
             final var batchUpload = new BatchUpload()
                     .setUploadedAt(now)
                     .setBatchOwnerName(request.batchOwnerName())
-                    .setStatus("Processing")
+                    .setStatus("PROCESSING")
                     .setTotalRecords(0)
                     .setValidRecords(0)
                     .setInvalidRecords(0);
@@ -106,4 +112,55 @@ public class BatchService {
         });
     }
 
+    @ReactiveTransaction
+    public Mono<Long> confirm(Long batchUploadId) {
+        return batchUploadRepository.findById(batchUploadId)
+                .switchIfEmpty(Mono.error(new BatchServiceException("Batch upload not found with ID: " + batchUploadId)))
+                .flatMap(batchUpload -> {
+                    if (!"AWAIT_CONFIRM".equalsIgnoreCase(batchUpload.getStatus())) {
+                        return Mono.error(new BatchServiceException(
+                                "Batch upload with ID " + batchUploadId + " is not in a valid state for confirmation. Current status: " + batchUpload.getStatus()));
+                    }
+                    return batchUploadProdRepository.moveValidRecordFromStagingToProd(batchUploadId)
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .flatMap(movedCount -> {
+                                if (movedCount <= 0) {
+                                    return Mono.error(new BatchServiceException(
+                                            "No valid records found to move for batch upload ID: " + batchUploadId));
+                                }
+                                log.info("Moved {} valid records from staging to production for batch upload ID: {}", movedCount, batchUploadId);
+                                return batchUploadStagingRepository.deleteByBatchUploadId(batchUploadId)
+                                        .then(batchUploadProdRepository.findByBatchUploadId(batchUploadId).collectList())
+                                        .flatMap(records -> {
+                                            String redisKey = "batchUploadId:" + batchUploadId;
+                                            return redisCacheService.setListValue(redisKey, records, Duration.ofHours(1))
+                                                    .onErrorResume(e -> {
+                                                        log.warn("Failed to cache batch upload ID {} to Redis: {}", batchUploadId, e.getMessage());
+                                                        return Mono.empty();
+                                                    });
+                                        })
+                                        .then(Mono.defer(() -> {
+                                            batchUpload.setStatus("CONFIRM");
+                                            batchUpload.setTotalRecords(movedCount.intValue());
+                                            batchUpload.setValidRecords(movedCount.intValue());
+                                            batchUpload.setInvalidRecords(0);
+                                            batchUpload.setSubmittedAt(DateUtil.now());
+
+                                            return batchUploadRepository.save(batchUpload)
+                                                    .doOnSuccess(saved -> log.info("BatchUpload ID {} processed successfully and sending to message broker", saved.getId()))
+                                                    .thenReturn(batchUpload.getId());
+                                        }));
+                            });
+                });
+    }
+
+    @ReactiveTransaction(readOnly = true)
+    public Flux<BatchUploadProd> getBatchRecordsByBatchUploadId(Long batchUploadId) {
+        return redisCacheService.getListValue("batchUploadId:" + batchUploadId)
+                .map(obj -> objectMapper.convertValue(obj, BatchUploadProd.class))
+                .switchIfEmpty(batchUploadProdRepository.findByBatchUploadId(batchUploadId)
+                        .doOnNext(record -> log.info("Cache miss for batch upload ID {}, fetching from database", batchUploadId)))
+                .cast(BatchUploadProd.class)
+                .doOnError(e -> log.error("Error retrieving records for batch upload ID {}: {}", batchUploadId, e.getMessage()));
+    }
 }

@@ -66,6 +66,16 @@ spring.datasource.hikari:
 # e.g: if you request to service A take time more than time limiter, it will terminate request and throw TimeOutException
 #spring.cloud.circuitbreaker.resilience4j:
 #  disableTimeLimiter: true
+spring.data.redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  timeout: 1000ms
+  lettuce:
+    pool:
+      enabled: true
+      max-active: 20
+      max-idle: 20
+      min-idle: 5
 
 logging:
   level:

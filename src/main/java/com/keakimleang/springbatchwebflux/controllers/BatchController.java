@@ -1,5 +1,6 @@
 package com.keakimleang.springbatchwebflux.controllers;
 
+import com.keakimleang.springbatchwebflux.entities.*;
 import com.keakimleang.springbatchwebflux.payloads.*;
 import com.keakimleang.springbatchwebflux.services.*;
 import java.util.*;
@@ -27,5 +28,19 @@ public class BatchController {
                         .map(tuple -> new BatchUploadRequest(tuple.getT1(), tuple.getT2(), false)))
                 .map(batchId -> ResponseEntity.ok(ApiResponse.cratedResourceResponse(batchId, null)))
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping(value = "{batchUploadId}/confirm")
+    public Mono<ResponseEntity<ApiResponse<Map<String, Long>>>> confirm(@PathVariable("batchUploadId") final Long billUploadId) {
+        return batchService.confirm(billUploadId)
+                .map(data -> ResponseEntity.ok(ApiResponse.cratedResourceResponse(data, "Biller uploaded successfully!")));
+    }
+
+    @GetMapping(value = "{batchUploadId}/records")
+    public Mono<ResponseEntity<ApiResponse<List<BatchUploadProd>>>> getRecords(
+            @PathVariable("batchUploadId") final Long batchUploadId) {
+        return batchService.getBatchRecordsByBatchUploadId(batchUploadId)
+                .collectList()
+                .map(data -> ResponseEntity.ok(ApiResponse.okResponse(data, null)));
     }
 }

@@ -3,6 +3,7 @@ package com.keakimleang.springbatchwebflux.batches;
 import com.keakimleang.springbatchwebflux.batches.consts.*;
 import java.util.*;
 import lombok.*;
+import org.jooq.*;
 import org.springframework.batch.core.*;
 import org.springframework.batch.core.configuration.annotation.*;
 import org.springframework.batch.core.job.builder.*;
@@ -18,6 +19,7 @@ import org.springframework.batch.item.file.transform.*;
 import org.springframework.beans.factory.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.*;
 import org.springframework.transaction.*;
 
@@ -49,9 +51,9 @@ public class BatchUploadConfig {
 
     @Bean
     @StepScope
-    public PoiItemReader<BatchUploadItem> excelBatchUploadReader(@Value("file:#{jobParameters['uploadFile']}") final Resource resource,
+    public PreserveDatesPoiItemReader<BatchUploadItem> excelBatchUploadReader(@Value("file:#{jobParameters['uploadFile']}") final Resource resource,
                                                                  final ExcelBatchUploadMapper excelBatchUploadMapper) {
-        final var poiItemReader = new PoiItemReader<BatchUploadItem>();
+        final var poiItemReader = new PreserveDatesPoiItemReader<BatchUploadItem>();
         poiItemReader.setName("excelBatchUploadReader");
         poiItemReader.setLinesToSkip(1);
         poiItemReader.setResource(resource);
@@ -60,7 +62,13 @@ public class BatchUploadConfig {
     }
 
     @Bean
-    public Step importExcelToDbStep(final PoiItemReader<BatchUploadItem> excelBatchUploadReader,
+    @StepScope
+    public BatchUploadWriter batchUploadWriter(final DSLContext create) {
+        return new BatchUploadWriter(create, BatchFieldName.BATCHES_UPLOADS_STAGING);
+    }
+
+    @Bean
+    public Step importExcelToDbStep(final PreserveDatesPoiItemReader<BatchUploadItem> excelBatchUploadReader,
                                     final BatchUploadProcessor batchUploadProcessor,
                                     final BatchUploadWriter batchUploadWriter) {
         return new StepBuilder("importExcelToDbStep", jobRepository)

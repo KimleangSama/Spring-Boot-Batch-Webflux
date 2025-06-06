@@ -6,6 +6,24 @@ import reactor.core.publisher.*;
 
 public interface BatchUploadProdRepository extends R2dbcRepository<BatchUploadProd, Long> {
 
-    @Query("DELETE FROM batches_uploads_prod WHERE batch_upload_id = :batchUploadId")
-    Mono<Long> deleteByBatchUploadId(Long batchUploadId);
+    @Modifying
+    @Query("""
+                    INSERT INTO batches_uploads_prod (
+                        batch_upload_id,
+                        customer_code,
+                        invoice_date,
+                        due_amount,
+                        currency,
+                        remark,
+                        is_valid,
+                        created_at
+                    )
+                    SELECT batch_upload_id, customer_code, invoice_date, due_amount,
+                        currency, remark, true, created_at
+                    FROM batches_uploads_staging staging
+                    WHERE staging.batch_upload_id = :batchUploadId AND staging.is_valid = true
+            """)
+    Mono<Long> moveValidRecordFromStagingToProd(Long batchUploadId);
+
+    Flux<BatchUploadProd> findByBatchUploadId(Long batchUploadId);
 }
