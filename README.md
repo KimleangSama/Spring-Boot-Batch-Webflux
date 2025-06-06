@@ -32,5 +32,5 @@ GET /api/v1/batches/{ID}/records
 To search for customer codes using a fuzzy search, you can use the following endpoint:
 
 ```http request
- POST /api/v1/batches/fuzzy-search?searchTerm=search
+POST /api/v1/batches/fuzzy-search?searchTerm=search
 ```
