@@ -6,11 +6,14 @@ import java.math.*;
 import java.time.*;
 import lombok.*;
 import org.springframework.data.annotation.*;
+import org.springframework.data.elasticsearch.annotations.*;
 import org.springframework.data.relational.core.mapping.*;
 
 @Table(BatchFieldName.BATCHES_UPLOADS_PROD)
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class BatchUploadProd implements Serializable {
     @Id
     private Long id;

@@ -1,7 +1,10 @@
 package com.keakimleang.springbatchwebflux.repos;
 
 import com.keakimleang.springbatchwebflux.entities.*;
+import org.springframework.data.elasticsearch.repository.config.*;
+import org.springframework.data.keyvalue.repository.*;
 import org.springframework.data.r2dbc.repository.*;
+import org.springframework.stereotype.*;
 import reactor.core.publisher.*;
 
 public interface BatchUploadProdRepository extends R2dbcRepository<BatchUploadProd, Long> {

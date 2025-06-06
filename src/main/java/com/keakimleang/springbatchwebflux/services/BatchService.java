@@ -9,12 +9,15 @@ import com.keakimleang.springbatchwebflux.payloads.*;
 import com.keakimleang.springbatchwebflux.repos.*;
 import com.keakimleang.springbatchwebflux.utils.*;
 import java.io.*;
+import java.math.*;
 import java.nio.file.*;
 import java.time.*;
 import lombok.*;
 import lombok.extern.slf4j.*;
 import org.springframework.batch.core.*;
 import org.springframework.batch.core.launch.*;
+import org.springframework.data.r2dbc.core.*;
+import org.springframework.r2dbc.core.*;
 import org.springframework.stereotype.*;
 import reactor.core.publisher.*;
 import reactor.core.scheduler.*;
@@ -32,6 +35,8 @@ public class BatchService {
     private final Job uploadBatchJob;
     private final RedisCacheService redisCacheService;
     private final ObjectMapper objectMapper;
+    private final R2dbcEntityTemplate template;
+    private final DatabaseClient databaseClient;
 
     public Mono<Long> upload(final Mono<BatchUploadRequest> requestMono) {
         return requestMono
@@ -163,4 +168,43 @@ public class BatchService {
                 .cast(BatchUploadProd.class)
                 .doOnError(e -> log.error("Error retrieving records for batch upload ID {}: {}", batchUploadId, e.getMessage()));
     }
+
+    @ReactiveTransaction(readOnly = true)
+    public Flux<BatchUploadProd> getBatchRecordsByFilter(BatchUploadRecordFilterRequest request) {
+        String sql = """
+                    SELECT bp.*
+                    FROM batches_uploads_prod bp
+                    JOIN batches_uploads bu ON bp.batch_upload_id = bu.id
+                    WHERE (:batchUploadId IS NULL OR bp.batch_upload_id = :batchUploadId)
+                      AND (:batchOwnerName IS NULL OR bu.batch_owner_name = :batchOwnerName)
+                """;
+        return databaseClient.sql(sql)
+                .bind("batchUploadId", request.getBatchUploadId())
+                .bind("batchOwnerName", request.getBatchOwnerName())
+                .map((row, metadata) -> new BatchUploadProd(
+                        row.get("id", Long.class),
+                        row.get("batch_upload_id", Long.class),
+                        row.get("customer_code", String.class),
+                        row.get("invoice_date", LocalDate.class),
+                        row.get("due_amount", BigDecimal.class),
+                        row.get("currency", String.class),
+                        row.get("created_at", LocalDateTime.class)
+                ))
+                .all()
+                .doOnNext(record -> log.info("Fetched joined record: {}", record));
+    }
+
+//    @ReactiveTransaction(readOnly = true)
+//    public Flux<BatchUploadProd> getBatchRecordsByFilter(BatchUploadRecordFilterRequest request) {
+//        final var filter = new BatchUploadRecordFilter();
+//        filter.setBatchUploadId(request.getBatchUploadId());
+//        filter.setBatchOwnerName(request.getBatchOwnerName());
+//        return Flux.defer(() -> {
+//            final var criteria = filter.getCriteria();
+//            final Query query = Query.query(criteria);
+//            return template.select(query, BatchUploadProd.class)
+//                    .doOnNext(record -> log.info("Fetched record: {}", record));
+//        });
+//    }
+
 }

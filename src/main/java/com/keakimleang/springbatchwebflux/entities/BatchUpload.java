@@ -5,6 +5,7 @@ import java.time.*;
 import lombok.*;
 import lombok.experimental.*;
 import org.springframework.data.annotation.*;
+import org.springframework.data.elasticsearch.annotations.*;
 import org.springframework.data.relational.core.mapping.*;
 
 @Table(BatchFieldName.BATCHES_UPLOADS)
