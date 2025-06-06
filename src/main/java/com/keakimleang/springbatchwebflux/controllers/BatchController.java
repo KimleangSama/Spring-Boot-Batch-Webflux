@@ -4,10 +4,12 @@ import co.elastic.clients.elasticsearch.core.search.*;
 import com.keakimleang.springbatchwebflux.entities.*;
 import com.keakimleang.springbatchwebflux.payloads.*;
 import com.keakimleang.springbatchwebflux.services.*;
+import com.keakimleang.springbatchwebflux.utils.*;
 import java.io.*;
 import java.util.*;
 import lombok.*;
 import lombok.extern.slf4j.*;
+import org.springframework.core.io.*;
 import org.springframework.http.*;
 import org.springframework.http.codec.multipart.*;
 import org.springframework.web.bind.annotation.*;
@@ -73,5 +75,13 @@ public class BatchController {
                     return ResponseEntity.ok(ApiResponse.okResponse(results, "Search results found: " + results.size()));
                 })
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping(value = "/{batchUploadId}/excel/export", produces = MediaTypeConstant.EXCEL)
+    public Mono<ResponseEntity<Resource>> exportToExcel(@PathVariable("batchUploadId") final Long batchUploadId) {
+        return batchService.downloadExcelBatchRecords(batchUploadId)
+                .map(fileDownload -> ResponseEntity.ok()
+                        .headers(fileDownload.headers())
+                        .body(fileDownload.file()));
     }
 }

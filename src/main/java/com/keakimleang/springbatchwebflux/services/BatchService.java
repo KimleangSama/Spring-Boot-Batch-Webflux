@@ -1,5 +1,6 @@
 package com.keakimleang.springbatchwebflux.services;
 
+import com.fasterxml.jackson.core.type.*;
 import com.fasterxml.jackson.databind.*;
 import com.keakimleang.springbatchwebflux.annotations.*;
 import com.keakimleang.springbatchwebflux.batches.*;
@@ -12,11 +13,14 @@ import java.io.*;
 import java.math.*;
 import java.nio.file.*;
 import java.time.*;
+import java.util.*;
 import lombok.*;
 import lombok.extern.slf4j.*;
 import org.springframework.batch.core.*;
 import org.springframework.batch.core.launch.*;
+import org.springframework.core.io.*;
 import org.springframework.data.r2dbc.core.*;
+import org.springframework.http.*;
 import org.springframework.r2dbc.core.*;
 import org.springframework.stereotype.*;
 import reactor.core.publisher.*;
@@ -206,5 +210,59 @@ public class BatchService {
 //                    .doOnNext(record -> log.info("Fetched record: {}", record));
 //        });
 //    }
+
+    public Mono<FileDownload> downloadExcelBatchRecords(final Long id) {
+        final var template = new ClassPathResource("/templates/batch-record-template.xlsx");
+
+        return batchUploadProdRepository.findByBatchUploadId(id)
+                .collectList()
+                .flatMap(records -> Mono.fromCallable(() -> {
+                    // Convert to row data
+                    List<BatchUploadProdElasticsearch> batchUploadProds = new ArrayList<>();
+                    for (final BatchUploadProd record : records) {
+                        batchUploadProds.add(new BatchUploadProdElasticsearch(record));
+                    }
+                    final var objectMapper = new ObjectMapper();
+                    objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+                    final var rows = objectMapper.convertValue(batchUploadProds, new TypeReference<List<Map<String, Object>>>() {
+                    });
+                    final var params = generateExcelParam(template, rows);
+
+                    // Generate Excel (blocking)
+                    final var output = ExportExcelHelper.generateExcelWithTemplate(params);
+
+                    // Build headers
+                    final var headers = new HttpHeaders();
+                    headers.add(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename("batch_records_%s_%s.xlsx".formatted(id + "", LocalDate.now()))
+                            .build()
+                            .toString());
+                    headers.add(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION);
+                    headers.setContentType(MediaType.parseMediaType(MediaTypeConstant.EXCEL));
+
+                    // Return FileDownload response
+                    return new FileDownload(
+                            new InputStreamResource(new ByteArrayInputStream(output.toByteArray())),
+                            headers
+                    );
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    private static GenerateExcelParam generateExcelParam(ClassPathResource template, List<Map<String, Object>> rows) {
+        final var params = new GenerateExcelParam();
+        params.setTemplateResource(template);
+        params.setOrderedColumnName(List.of(
+                "id",
+                "batchUploadId",
+                "customerCode",
+                "invoiceDate",
+                "dueAmount",
+                "currency"
+        ));
+        params.setRows(rows);
+        params.setStartRowDataAt(4);
+        params.setCopyFirstRowCellStyle(true);
+        return params;
+    }
 
 }

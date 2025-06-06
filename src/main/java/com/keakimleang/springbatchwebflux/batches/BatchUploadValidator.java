@@ -17,7 +17,7 @@ import reactor.core.publisher.*;
 @Slf4j
 @Component
 public class BatchUploadValidator {
-    private final Set<String> supportedFiles = Set.of("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv");
+    private final Set<String> supportedFiles = Set.of(MediaTypeConstant.EXCEL, MediaTypeConstant.CSV);
     private final Validator validator;
 
     public BatchUploadValidator(final Validator validator) {
