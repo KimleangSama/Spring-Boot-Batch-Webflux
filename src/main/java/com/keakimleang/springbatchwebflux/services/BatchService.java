@@ -19,7 +19,6 @@ import lombok.extern.slf4j.*;
 import org.springframework.batch.core.*;
 import org.springframework.batch.core.launch.*;
 import org.springframework.core.io.*;
-import org.springframework.data.r2dbc.core.*;
 import org.springframework.http.*;
 import org.springframework.r2dbc.core.*;
 import org.springframework.stereotype.*;
@@ -39,7 +38,6 @@ public class BatchService {
     private final Job uploadBatchJob;
     private final RedisCacheService redisCacheService;
     private final ObjectMapper objectMapper;
-    private final R2dbcEntityTemplate template;
     private final DatabaseClient databaseClient;
 
     public Mono<Long> upload(final Mono<BatchUploadRequest> requestMono) {
@@ -47,23 +45,23 @@ public class BatchService {
                 .flatMap(batchUploadValidator::validateFile)
                 .flatMap(request -> saveUploadToTempDir(request)
                         .flatMap(temp -> Mono.zip(Mono.just(request), Mono.just(temp))))
-                .flatMap(tuple2 -> Mono.zip(Mono.just(tuple2.getT2()), saveBillUpload(tuple2.getT1()), Mono.just(tuple2.getT1())))
+                .flatMap(tuple2 -> Mono.zip(Mono.just(tuple2.getT2()), saveBatchUpload(tuple2.getT1()), Mono.just(tuple2.getT1())))
                 .flatMap(tuple3 -> {
                     final var runAsync = tuple3.getT3().runJobAsync();
                     if (runAsync) {
                         // Run the job in the background and immediately return the upload ID
-                        Mono.fromRunnable(() -> processBillUploadJob(tuple3, true).subscribe())
+                        Mono.fromRunnable(() -> processBatchUploadJob(tuple3, true).subscribe())
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .subscribe();
                         // Return the upload ID immediately without waiting for job completion
                         return Mono.just(tuple3.getT2().getId());
                     } else {
-                        return processBillUploadJob(tuple3, false);
+                        return processBatchUploadJob(tuple3, false);
                     }
                 });
     }
 
-    private Mono<Long> processBillUploadJob(final Tuple2<Path, BatchUpload> tuple2,
+    private Mono<Long> processBatchUploadJob(final Tuple2<Path, BatchUpload> tuple2,
                                             final boolean runJobAsync) {
         return Mono.fromCallable(() -> {
                     final var jobParams = new JobParametersBuilder()
@@ -107,7 +105,7 @@ public class BatchService {
                 .onErrorMap(IOException.class, RuntimeException::new); // Wrap IOException into unchecked
     }
 
-    private Mono<BatchUpload> saveBillUpload(final BatchUploadRequest request) {
+    private Mono<BatchUpload> saveBatchUpload(final BatchUploadRequest request) {
         return Mono.defer(() -> {
             final var now = DateUtil.now();
             final var batchUpload = new BatchUpload()
@@ -251,14 +249,7 @@ public class BatchService {
     private static GenerateExcelParam generateExcelParam(ClassPathResource template, List<Map<String, Object>> rows) {
         final var params = new GenerateExcelParam();
         params.setTemplateResource(template);
-        params.setOrderedColumnName(List.of(
-                "id",
-                "batchUploadId",
-                "customerCode",
-                "invoiceDate",
-                "dueAmount",
-                "currency"
-        ));
+        params.setOrderedColumnName(ORDERED_COLUMN);
         params.setRows(rows);
         params.setStartRowDataAt(4);
         params.setCopyFirstRowCellStyle(true);

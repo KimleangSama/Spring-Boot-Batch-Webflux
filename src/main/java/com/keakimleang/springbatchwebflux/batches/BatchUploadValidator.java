@@ -80,8 +80,8 @@ public class BatchUploadValidator {
         return URLConnection.guessContentTypeFromName(filePart.filename());
     }
 
-    public String validateItem(final BatchUploadItem billUploadItem) {
-        final var errors = validator.validate(billUploadItem);
+    public String validateItem(final BatchUploadItem batchUploadItem) {
+        final var errors = validator.validate(batchUploadItem);
         return String.join("\n", errors.stream()
                 .map(ConstraintViolation::getMessage)
                 .toList());

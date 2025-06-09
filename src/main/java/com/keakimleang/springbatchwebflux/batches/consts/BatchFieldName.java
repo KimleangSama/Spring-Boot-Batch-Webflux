@@ -23,4 +23,18 @@ public class BatchFieldName {
     public static final String UPLOAD_FILE = "uploadFile";
     public static final String UPLOAD_BATCH_ID = "uploadBatchId";
     public static final String RUN_ASYNC_FLOW = "runAsyncFlow";
+
+    public static final List<String> ORDERED_COLUMN = List.of(
+            "id",
+            "batchUploadId",
+            "customerCode",
+            "invoiceDate",
+            "dueAmount",
+            "currency"
+    );
+
+    public static final String CUSTOMER_CODE = "customer code";
+    public static final String INVOICE_DATE = "invoice date";
+    public static final String DUE_AMOUNT = "due amount";
+    public static final String CURRENCY = "currency";
 }

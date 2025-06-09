@@ -36,9 +36,9 @@ public class BatchController {
     }
 
     @PostMapping(value = "{batchUploadId}/confirm")
-    public Mono<ResponseEntity<ApiResponse<Map<String, Long>>>> confirm(@PathVariable("batchUploadId") final Long billUploadId) {
-        return batchService.confirm(billUploadId)
-                .map(data -> ResponseEntity.ok(ApiResponse.cratedResourceResponse(data, "Biller uploaded successfully!")));
+    public Mono<ResponseEntity<ApiResponse<Map<String, Long>>>> confirm(@PathVariable("batchUploadId") final Long batchUploadId) {
+        return batchService.confirm(batchUploadId)
+                .map(data -> ResponseEntity.ok(ApiResponse.cratedResourceResponse(data, "Batcher uploaded successfully!")));
     }
 
     @GetMapping(value = "{batchUploadId}/records")

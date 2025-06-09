@@ -1,5 +1,6 @@
 package com.keakimleang.springbatchwebflux.batches;
 
+import com.keakimleang.springbatchwebflux.batches.consts.*;
 import java.util.*;
 import java.util.stream.*;
 import org.springframework.batch.core.configuration.annotation.*;
@@ -27,10 +28,10 @@ public class ExcelBatchUploadMapper implements RowMapper<BatchUploadItem> {
         }
         final var props = rowSet.getProperties();
         final var item = new BatchUploadItem();
-        item.setCustomerCode(getStringValue("customer code", props));
-        item.setInvoiceDate(getStringValue("invoice date", props));
-        item.setCurrency(getStringValue("currency", props));
-        item.setDueAmount(getStringValue("due amount", props));
+        item.setCustomerCode(getStringValue(BatchFieldName.CUSTOMER_CODE, props));
+        item.setInvoiceDate(getStringValue(BatchFieldName.INVOICE_DATE, props));
+        item.setCurrency(getStringValue(BatchFieldName.CURRENCY, props));
+        item.setDueAmount(getStringValue(BatchFieldName.DUE_AMOUNT, props));
         return item;
     }
 

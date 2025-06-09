@@ -131,7 +131,7 @@ public class PreserveDatesPoiItemReader<T> extends PoiItemReader<T> {
             // The first row is the header (skipped), so we start at 1
             currentRowNumber++;
 
-            // If we have a BillUploadItem, restore original numeric values for date fields
+            // If we have a BatchUploadItem, restore original numeric values for date fields
             if (item instanceof BatchUploadItem) {
                 restoreOriginalValues((BatchUploadItem) item);
             }
@@ -140,20 +140,20 @@ public class PreserveDatesPoiItemReader<T> extends PoiItemReader<T> {
         return item;
     }
 
-    private void restoreOriginalValues(final BatchUploadItem billItem) {
+    private void restoreOriginalValues(final BatchUploadItem batchItem) {
         final Map<Integer, String> rowCache = originalNumericValueCache.get(currentRowNumber);
 
         if (rowCache != null) {
             // Restore invoice date if we have the original value
-            restoreOriginalValueIfAvailable(billItem, rowCache);
+            restoreOriginalValueIfAvailable(batchItem, rowCache);
         }
     }
 
-    private void restoreOriginalValueIfAvailable(final BatchUploadItem billItem, final Map<Integer, String> rowCache) {
+    private void restoreOriginalValueIfAvailable(final BatchUploadItem batchItem, final Map<Integer, String> rowCache) {
         final Integer columnIndex = dateColumnIndexMap.get(PreserveDatesPoiItemReader.INVOICE_DATE_COLUMN_NAME);
         if (columnIndex != null && rowCache.containsKey(columnIndex)) {
             final String originalValue = rowCache.get(columnIndex);
-            billItem.setInvoiceDate(originalValue);
+            batchItem.setInvoiceDate(originalValue);
         }
     }
 }
